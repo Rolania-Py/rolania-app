@@ -1,5 +1,5 @@
-# ==============================================================================
-# CALCULADORA Y SIMULADOR FISCAL ROLANIA — MVP v1.2 (Gráficos y Descargas)
+==============================================================================
+# CALCULADORA Y SIMULADOR FISCAL ROLANIA — MVP v1.3 (Descargas PDF Corregidas)
 # Aplicación web interactiva con Streamlit para expatriados españoles en Paraguay
 # ==============================================================================
 
@@ -22,9 +22,8 @@ TIPO_TRAMO_3 = 0.40
 
 TIPO_IRNR_PENSION_PUBLICA = 0.24
 
-# ⚠️ TU NÚMERO DE WHATSAPP COMERCIAL (Cambia los números entre comillas por el tuyo)
-# Recuerda: Código de país delante, SIN símbolo +, SIN ceros iniciales, SIN espacios.
-TELEFONO_WHATSAPP_ROLANIA = "595985540294"
+# ⚠️ TU NÚMERO DE WHATSAPP COMERCIAL (Recuerda poner tu móvil real con prefijo)
+TELEFONO_WHATSAPP_ROLANIA = "34600000000"
 
 # --- 3. CONFIGURACIÓN INICIAL DE LA PÁGINA ------------------------------------
 st.set_page_config(
@@ -60,10 +59,6 @@ def calcular_carga_paraguay(perfil: str, ingresos: float, reside_py: bool, nacio
 
 def construir_diagrama_mermaid(perfil: str, reside_py: bool, nacionalidad: bool,
                                txt_espana: str, txt_paraguay: str, txt_ahorro: str) -> str:
-    """
-    Sintaxis depurada y a prueba de fallos para Mermaid v10+.
-    Elimina caracteres conflictivos dentro de rombos y normaliza las flechas.
-    """
     if not reside_py:
         return f"""
 flowchart TD
@@ -200,7 +195,7 @@ if ahorro_neto > 0 and compromiso_residencia:
         f"de forma legal, protegiendo tu patrimonio y poder adquisitivo."
     )
 
-# --- 8. MOTOR DE MONETIZACIÓN DUAL (MVP v1.2) ---------------------------------
+# --- 8. MOTOR DE MONETIZACIÓN DUAL (MVP v1.3 - CORREGIDO) ---------------------
 st.markdown("---")
 st.markdown("### 🚀 Da el Salto a Paraguay: Elige tu Vía de Acción")
 
@@ -231,31 +226,33 @@ with col_cta1:
 with col_cta2:
     st.warning("📚 **Vía Estudio: Libreto-Guía en PDF**\n\n¿Prefieres analizar toda la legislación, tablas comparativas y diagramas a tu ritmo? Descarga el manual oficial.")
     
+    # La urna del formulario: solo captura el texto y el clic de envío
     with st.form(key="form_lead_rolania", clear_on_submit=False):
         email_cliente = st.text_input("Tu Correo Electrónico Profesional", placeholder="ejemplo@profesional.com")
         btn_enviar_lead = st.form_submit_button("📥 Desbloquear Libreto-Guía ROLANIA", use_container_width=True)
-        
-        if btn_enviar_lead:
-            if "@" in email_cliente and "." in email_cliente:
-                st.success(f"✅ ¡Correo {email_cliente} verificado! Haz clic abajo para descargar tu manual oficial:")
-                
-                # Sistema inteligente: busca el archivo PDF en el repositorio
-                nombre_archivo_pdf = "libreto_rolania.pdf"
-                if os.path.exists(nombre_archivo_pdf):
-                    with open(nombre_archivo_pdf, "rb") as pdf_file:
-                        PDFbyte = pdf_file.read()
-                    st.download_button(
-                        label="📕 DESCARGAR LIBRETO-GUÍA ROLANIA (PDF)",
-                        data=PDFbyte,
-                        file_name="Libreto_Guia_ROLANIA_Expatriacion.pdf",
-                        mime="application/pdf",
-                        type="primary",
-                        use_container_width=True
-                    )
-                else:
-                    st.info("💡 **Nota de Sistema ROLANIA:** El manual en PDF se está actualizando en nuestros servidores. Por favor, contáctanos por WhatsApp para enviártelo al instante.")
+    
+    # ⚠️ CORRECCIÓN ARQUITECTÓNICA v1.3:
+    # La validación y el botón de descarga se ejecutan FUERA del bloque st.form
+    if btn_enviar_lead:
+        if "@" in email_cliente and "." in email_cliente:
+            st.success(f"✅ ¡Correo **{email_cliente}** verificado! Haz clic abajo para descargar tu manual oficial:")
+            
+            nombre_archivo_pdf = "libreto_rolania.pdf"
+            if os.path.exists(nombre_archivo_pdf):
+                with open(nombre_archivo_pdf, "rb") as pdf_file:
+                    PDFbyte = pdf_file.read()
+                st.download_button(
+                    label="📕 DESCARGAR LIBRETO-GUÍA ROLANIA (PDF)",
+                    data=PDFbyte,
+                    file_name="Libreto_Guia_ROLANIA_Expatriacion.pdf",
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True
+                )
             else:
-                st.error("⚠️ Por favor, introduce una dirección de correo electrónico válida.")
+                st.info("💡 **Nota de Sistema ROLANIA:** El manual en PDF se está actualizando en nuestros servidores. Por favor, contáctanos por WhatsApp para enviártelo al instante.")
+        else:
+            st.error("⚠️ Por favor, introduce una dirección de correo electrónico válida.")
 
 st.divider()
 
@@ -302,7 +299,6 @@ with st.expander("📜 Ver justificación legal y diagrama visual de tu ruta", e
         txt_ahorro=txt_ahorro,
     )
     
-    # Renderizado estable y sin conflictos de comillas
     renderizar_mermaid_seguro(codigo_mermaid)
 
 # --- 10. PIE DE PÁGINA (FOOTER) -----------------------------------------------
