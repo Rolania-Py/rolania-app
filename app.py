@@ -1,4 +1,4 @@
-==============================================================================
+#==============================================================================
 # CALCULADORA Y SIMULADOR FISCAL ROLANIA — MVP v1.3 (Descargas PDF Corregidas)
 # Aplicación web interactiva con Streamlit para expatriados españoles en Paraguay
 # ==============================================================================
