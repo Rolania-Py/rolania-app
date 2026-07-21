@@ -1,5 +1,5 @@
 # ==============================================================================
-# CALCULADORA Y SIMULADOR FISCAL ROLANIA — MVP v1.1 (Estable + Monetización)
+# CALCULADORA Y SIMULADOR FISCAL ROLANIA — MVP v1.2 (Gráficos y Descargas)
 # Aplicación web interactiva con Streamlit para expatriados españoles en Paraguay
 # ==============================================================================
 
@@ -7,6 +7,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import urllib.parse
+import os
 
 # --- 2. CONSTANTES DE LA APLICACIÓN -------------------------------------------
 PERFIL_AUTONOMO = "Autónomo Activo (Servicios Online)"
@@ -21,8 +22,9 @@ TIPO_TRAMO_3 = 0.40
 
 TIPO_IRNR_PENSION_PUBLICA = 0.24
 
-# ⚠️ NÚMERO DE WHATSAPP COMERCIAL DE ROLANIA (Cambia esto por tu móvil real con código de país)
-TELEFONO_WHATSAPP_ROLANIA = "34600000000"
+# ⚠️ TU NÚMERO DE WHATSAPP COMERCIAL (Cambia los números entre comillas por el tuyo)
+# Recuerda: Código de país delante, SIN símbolo +, SIN ceros iniciales, SIN espacios.
+TELEFONO_WHATSAPP_ROLANIA = "595985540294"
 
 # --- 3. CONFIGURACIÓN INICIAL DE LA PÁGINA ------------------------------------
 st.set_page_config(
@@ -58,54 +60,54 @@ def calcular_carga_paraguay(perfil: str, ingresos: float, reside_py: bool, nacio
 
 def construir_diagrama_mermaid(perfil: str, reside_py: bool, nacionalidad: bool,
                                txt_espana: str, txt_paraguay: str, txt_ahorro: str) -> str:
+    """
+    Sintaxis depurada y a prueba de fallos para Mermaid v10+.
+    Elimina caracteres conflictivos dentro de rombos y normaliza las flechas.
+    """
     if not reside_py:
         return f"""
 flowchart TD
-    A["🇪🇸 Situación actual en España<br>Carga estimada: {txt_espana}"] --> B{{"¿Resides +183 días al año en Paraguay<br>y obtienes el RUC?"}}
-    B -- "NO" --> C["❌ Art. 9 LIRPF: sigues siendo<br>residente fiscal en España"]
-    C --> D["Sin traslado físico ni RUC no hay exención posible<br>Carga final: {txt_paraguay} | Ahorro neto: {txt_ahorro}"]
+    A["🇪🇸 Situación en España (Carga: {txt_espana})"] --> B{{"¿Resides +183 días en Paraguay con RUC?"}}
+    B -->|NO| C["❌ Art. 9 LIRPF: Sigues siendo residente fiscal en España"]
+    C --> D["Sin residencia efectiva no hay exención posible<br/>Carga Paraguay: {txt_paraguay} | Ahorro neto: {txt_ahorro}"]
     style C fill:#ffe5e5,stroke:#c0392b,stroke-width:2px
     style D fill:#ffe5e5,stroke:#c0392b,stroke-width:2px
 """
     if perfil == PERFIL_AUTONOMO:
         return f"""
 flowchart TD
-    A["🇪🇸 Autónomo en España<br>Carga actual: {txt_espana}"] --> B{{"¿Resides +183 días al año en Paraguay<br>y obtienes el RUC?"}}
-    B -- "SÍ" --> C["✅ Residencia fiscal en Paraguay acreditada<br>+ baja y cese de cuotas RETA en España"]
-    C --> D["Art. 14 CDI: al no tener base fija en España,<br>tus beneficios profesionales solo tributan en Paraguay"]
-    D --> E["Ley 6380/2019: el principio de territorialidad exime<br>los ingresos facturados a clientes del extranjero"]
-    E --> F["💰 Carga final en Paraguay: 0 €<br>Ahorro neto anual: {txt_ahorro}"]
+    A["🇪🇸 Autónomo en España (Carga: {txt_espana})"] --> B{{"¿Resides +183 días en Paraguay con RUC?"}}
+    B -->|SÍ| C["✅ Residencia fiscal en Paraguay<br/>Baja y cese de cuotas RETA en España"]
+    C --> D["Art. 14 CDI: Sin base fija en España,<br/>beneficios gravados solo en Paraguay"]
+    D --> E["Ley 6380/2019: Territorialidad paraguaya<br/>Facturación al exterior exenta (0 %)"]
+    E --> F["💰 Carga final en Paraguay: 0 €<br/>Ahorro neto anual: {txt_ahorro}"]
     style F fill:#e6ffed,stroke:#1a7f37,stroke-width:2px
 """
     elif perfil == PERFIL_PRIVADO:
         return f"""
 flowchart TD
-    A["🇪🇸 Pensionista Privado en España<br>Carga actual: {txt_espana}"] --> B{{"¿Resides +183 días al año en Paraguay<br>y obtienes el RUC?"}}
-    B -- "SÍ" --> C["✅ Residencia fiscal en Paraguay acreditada<br>+ comunicación al INSS / pagador privado"]
-    C --> D["Art. 17 CDI: la pensión privada queda sometida<br>a imposición EXCLUSIVA en el Estado de residencia"]
-    D --> E["Ley 6380/2019: la pensión procedente de España<br>es renta de fuente extranjera en Paraguay (tipo 0 %)"]
-    E --> F["💰 Carga final en Paraguay: 0 €<br>Ahorro neto anual: {txt_ahorro}"]
+    A["🇪🇸 Pensionista Privado (Carga: {txt_espana})"] --> B{{"¿Resides +183 días en Paraguay con RUC?"}}
+    B -->|SÍ| C["✅ Residencia fiscal en Paraguay<br/>Comunicación formal a INSS / Pagador"]
+    C --> D["Art. 17 CDI: Pensión privada tributa<br/>en exclusiva en el Estado de residencia"]
+    D --> E["Ley 6380/2019: Renta procedente del exterior<br/>queda exenta en Paraguay (0 %)"]
+    E --> F["💰 Carga final en Paraguay: 0 €<br/>Ahorro neto anual: {txt_ahorro}"]
     style F fill:#e6ffed,stroke:#1a7f37,stroke-width:2px
 """
     else:
         return f"""
 flowchart TD
-    A["🇪🇸 Pensionista Público (Clases Pasivas)<br>Carga actual: {txt_espana}"] --> B{{"¿Resides +183 días al año en Paraguay<br>y obtienes el RUC?"}}
-    B -- "SÍ" --> C{{"¿Tramitas la Nacionalidad Paraguaya<br>(Ley 6984/2022) a los 3 años de residencia?"}}
-    C -- "SÍ" --> D["Art. 18.2.b CDI: exención activada<br>al ser nacional y residente, tributas solo en Paraguay"]
-    D --> E["Ley 6380/2019: fuente extranjera en Paraguay → tipo 0 %"]
-    E --> F["💰 Carga final en Paraguay: 0 €<br>Ahorro neto anual: {txt_ahorro}"]
-    C -- "NO" --> G["Art. 18.2.a CDI (regla general): España retiene<br>por IRNR en exclusiva (tipo medio ~24 %)"]
-    G --> H["Carga final en Paraguay: {txt_paraguay}<br>Ahorro neto anual: {txt_ahorro}"]
+    A["🇪🇸 Pensionista Público (Carga: {txt_espana})"] --> B{{"¿Resides +183 días en Paraguay con RUC?"}}
+    B -->|SÍ| C{{"¿Tramitas Nacionalidad Paraguaya<br/>a los 3 años de residencia?"}}
+    C -->|SÍ| D["Art. 18.2.b CDI: Exención activada al ser<br/>nacional y residente -> tributa solo en Paraguay"]
+    D --> E["Ley 6380/2019: Fuente extranjera exenta (0 %)"]
+    E --> F["💰 Carga final en Paraguay: 0 €<br/>Ahorro neto anual: {txt_ahorro}"]
+    C -->|NO| G["Art. 18.2.a CDI: Regla general -> España retiene<br/>por IRNR en exclusiva (tipo medio ~24 %)"]
+    G --> H["Carga final en Paraguay: {txt_paraguay}<br/>Ahorro neto anual: {txt_ahorro}"]
     style F fill:#e6ffed,stroke:#1a7f37,stroke-width:2px
     style G fill:#fff4e5,stroke:#b26a00,stroke-width:2px
 """
 
 def renderizar_mermaid_seguro(codigo_mermaid: str, altura: int = 420):
-    """
-    Parche de Arquitectura v1.1: Renderiza Mermaid usando el motor oficial de CDN
-    en un componente HTML aislado para evitar errores de atributos en Streamlit.
-    """
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -198,7 +200,7 @@ if ahorro_neto > 0 and compromiso_residencia:
         f"de forma legal, protegiendo tu patrimonio y poder adquisitivo."
     )
 
-# --- 8. MOTOR DE MONETIZACIÓN DUAL (NUEVO MVP v1.1) ---------------------------
+# --- 8. MOTOR DE MONETIZACIÓN DUAL (MVP v1.2) ---------------------------------
 st.markdown("---")
 st.markdown("### 🚀 Da el Salto a Paraguay: Elige tu Vía de Acción")
 
@@ -208,7 +210,6 @@ col_cta1, col_cta2 = st.columns(2)
 with col_cta1:
     st.info("📲 **Vía Rápida: Consultoría Personalizada**\n\n¿Quieres validar tu caso con un experto fiscal en directo? Habla ahora mismo con nuestro equipo comercial.")
     
-    # Redacción dinámica del mensaje de WhatsApp integrando los datos simulados
     mensaje_wsp = (
         f"Hola equipo ROLANIA. He usado vuestra calculadora fiscal online:\n"
         f"• Mi perfil: {perfil_seleccionado}\n"
@@ -226,18 +227,33 @@ with col_cta1:
         help="Abre tu aplicación de WhatsApp con un mensaje pre-redactado con tus datos."
     )
 
-# VÍA 2: CAPTURA DE LEADS (LIBRETO-GUÍA PDF)
+# VÍA 2: CAPTURA Y DESBLOQUEO DIRECTO DEL LIBRETO-GUÍA PDF
 with col_cta2:
     st.warning("📚 **Vía Estudio: Libreto-Guía en PDF**\n\n¿Prefieres analizar toda la legislación, tablas comparativas y diagramas a tu ritmo? Descarga el manual oficial.")
     
-    with st.form(key="form_lead_rolania", clear_on_submit=True):
+    with st.form(key="form_lead_rolania", clear_on_submit=False):
         email_cliente = st.text_input("Tu Correo Electrónico Profesional", placeholder="ejemplo@profesional.com")
-        btn_enviar_lead = st.form_submit_button("📥 Enviar a mi correo el Libreto-Guía ROLANIA", use_container_width=True)
+        btn_enviar_lead = st.form_submit_button("📥 Desbloquear Libreto-Guía ROLANIA", use_container_width=True)
         
         if btn_enviar_lead:
             if "@" in email_cliente and "." in email_cliente:
-                st.success(f"✅ ¡Confirmado! Hemos registrado tu solicitud para el correo **{email_cliente}**. Recibirás el Libreto-Guía en los próximos 5 minutos.")
-                # Nota de arquitecto: Aquí en el futuro conectaremos tu base de datos de correos (ej. Mailchimp/ActiveCampaign)
+                st.success(f"✅ ¡Correo {email_cliente} verificado! Haz clic abajo para descargar tu manual oficial:")
+                
+                # Sistema inteligente: busca el archivo PDF en el repositorio
+                nombre_archivo_pdf = "libreto_rolania.pdf"
+                if os.path.exists(nombre_archivo_pdf):
+                    with open(nombre_archivo_pdf, "rb") as pdf_file:
+                        PDFbyte = pdf_file.read()
+                    st.download_button(
+                        label="📕 DESCARGAR LIBRETO-GUÍA ROLANIA (PDF)",
+                        data=PDFbyte,
+                        file_name="Libreto_Guia_ROLANIA_Expatriacion.pdf",
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True
+                    )
+                else:
+                    st.info("💡 **Nota de Sistema ROLANIA:** El manual en PDF se está actualizando en nuestros servidores. Por favor, contáctanos por WhatsApp para enviártelo al instante.")
             else:
                 st.error("⚠️ Por favor, introduce una dirección de correo electrónico válida.")
 
@@ -286,7 +302,7 @@ with st.expander("📜 Ver justificación legal y diagrama visual de tu ruta", e
         txt_ahorro=txt_ahorro,
     )
     
-    # Usamos la nueva función de renderizado seguro por HTML aislado
+    # Renderizado estable y sin conflictos de comillas
     renderizar_mermaid_seguro(codigo_mermaid)
 
 # --- 10. PIE DE PÁGINA (FOOTER) -----------------------------------------------
