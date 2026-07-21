@@ -1,35 +1,30 @@
 # ==============================================================================
-# CALCULADORA Y SIMULADOR FISCAL ROLANIA — MVP v1.0
+# CALCULADORA Y SIMULADOR FISCAL ROLANIA — MVP v1.1 (Estable + Monetización)
 # Aplicación web interactiva con Streamlit para expatriados españoles en Paraguay
 # ==============================================================================
 
 # --- 1. IMPORTACIONES ---------------------------------------------------------
-# 'streamlit' es la librería de Python que transforma este script en una página
-# web interactiva. Cada vez que el usuario mueve un control (deslizador, menú...),
-# Streamlit ejecuta el código desde el principio para redibujar la pantalla.
 import streamlit as st
+import streamlit.components.v1 as components
+import urllib.parse
 
 # --- 2. CONSTANTES DE LA APLICACIÓN -------------------------------------------
-# Guardamos los nombres de los perfiles en constantes (convención en mayúsculas)
-# para evitar errores tipográficos si tuviéramos que escribir las cadenas repetidas veces.
 PERFIL_AUTONOMO = "Autónomo Activo (Servicios Online)"
 PERFIL_PRIVADO = "Pensionista Privado (INSS / Planes)"
 PERFIL_PUBLICO = "Pensionista Público (Clases Pasivas)"
 
-# Tramos de estimación fiscal en España (simplificación IRPF + RETA o IRNR).
-TRAMO_1_LIMITE = 30000  # Hasta 30.000 € anuales → tipo efectivo estimado: 22 %
-TRAMO_2_LIMITE = 60000  # De 30.001 € a 60.000 € → tipo efectivo estimado: 32 %
+TRAMO_1_LIMITE = 30000
+TRAMO_2_LIMITE = 60000
 TIPO_TRAMO_1 = 0.22
 TIPO_TRAMO_2 = 0.32
-TIPO_TRAMO_3 = 0.40     # Más de 60.000 € → tipo efectivo estimado: 40 %
+TIPO_TRAMO_3 = 0.40
 
-# Retención media estimada en España por IRNR (Impuesto sobre la Renta de No Residentes)
-# aplicada a pensiones públicas cuando no se activa la excepción de nacionalidad.
 TIPO_IRNR_PENSION_PUBLICA = 0.24
 
+# ⚠️ NÚMERO DE WHATSAPP COMERCIAL DE ROLANIA (Cambia esto por tu móvil real con código de país)
+TELEFONO_WHATSAPP_ROLANIA = "34600000000"
+
 # --- 3. CONFIGURACIÓN INICIAL DE LA PÁGINA ------------------------------------
-# Debe ser SIEMPRE la primera orden de Streamlit del archivo.
-# Define el título en la pestaña del navegador, el icono y el modo de pantalla ancha.
 st.set_page_config(
     page_title="Simulador Fiscal ROLANIA",
     page_icon="🧭",
@@ -38,13 +33,9 @@ st.set_page_config(
 
 # --- 4. FUNCIONES DEL MOTOR DE CÁLCULO (BACKEND) ------------------------------
 def formato_euros(cantidad: float) -> str:
-    """Convierte un número en texto con formato de moneda español: 19200 -> '19.200 €'."""
-    # Formateamos con comas como separador de miles y luego las reemplazamos por puntos.
     return f"{cantidad:,.0f} €".replace(",", ".")
 
-
 def calcular_carga_espana(ingresos: float) -> float:
-    """Calcula la presión fiscal actual estimada en España según el tramo de ingresos."""
     if ingresos <= TRAMO_1_LIMITE:
         return ingresos * TIPO_TRAMO_1
     elif ingresos <= TRAMO_2_LIMITE:
@@ -52,47 +43,21 @@ def calcular_carga_espana(ingresos: float) -> float:
     else:
         return ingresos * TIPO_TRAMO_3
 
-
 def calcular_carga_paraguay(perfil: str, ingresos: float, reside_py: bool, nacionalidad: bool) -> float:
-    """
-    Calcula la carga fiscal final en Paraguay bajo la estrategia jurídica ROLANIA.
-    Aplica el Convenio de Doble Imposición (CDI) España-Paraguay y la Ley 6380/2019 paraguaya.
-    """
-    # Si el cliente NO se muda físicamente o no saca el RUC, sigue siendo residente fiscal
-    # en España por el Art. 9 de la LIRPF. No hay ahorro posible; tributa igual que en España.
     if not reside_py:
         return calcular_carga_espana(ingresos)
 
-    # Si SÍ cumple con la permanencia (>183 días) y activa el RUC paraguayo:
-    if perfil == PERFIL_AUTONOMO:
-        # Art. 14 CDI (sin base fija en España, el IRPF baja al 0 %) +
-        # Ley 6380/2019 (territorialidad paraguaya: renta de fuente extranjera al 0 %) +
-        # Cese de actividad en España (baja del RETA, cuota autónomos = 0 €).
+    if perfil == PERFIL_AUTONOMO or perfil == PERFIL_PRIVADO:
         return 0.0
-
-    elif perfil == PERFIL_PRIVADO:
-        # Art. 17 CDI (las pensiones privadas tributan EXCLUSIVAMENTE en Paraguay) +
-        # Ley 6380/2019 (la pensión procedente del extranjero es fuente extranjera -> 0 %).
-        return 0.0
-
     elif perfil == PERFIL_PUBLICO:
-        # Si el pensionista público obtiene la nacionalidad paraguaya (Ley 6984/2022),
-        # activa el Art. 18.2.b del CDI: la pensión tributa solo en Paraguay -> 0 %.
         if nacionalidad:
             return 0.0
         else:
-            # Si NO tramita la nacionalidad, se aplica la regla general (Art. 18.2.a CDI):
-            # España retiene en exclusiva por IRNR (media estimada del 24 %).
             return ingresos * TIPO_IRNR_PENSION_PUBLICA
-
     return 0.0
-
 
 def construir_diagrama_mermaid(perfil: str, reside_py: bool, nacionalidad: bool,
                                txt_espana: str, txt_paraguay: str, txt_ahorro: str) -> str:
-    """Genera el código de diagrama Mermaid según las decisiones de la simulación."""
-    
-    # Caso 1: El cliente no acepta vivir +183 días en Paraguay ni tramitar el RUC
     if not reside_py:
         return f"""
 flowchart TD
@@ -102,8 +67,6 @@ flowchart TD
     style C fill:#ffe5e5,stroke:#c0392b,stroke-width:2px
     style D fill:#ffe5e5,stroke:#c0392b,stroke-width:2px
 """
-
-    # Caso 2: Autónomo Activo que sí traslada su residencia
     if perfil == PERFIL_AUTONOMO:
         return f"""
 flowchart TD
@@ -114,8 +77,6 @@ flowchart TD
     E --> F["💰 Carga final en Paraguay: 0 €<br>Ahorro neto anual: {txt_ahorro}"]
     style F fill:#e6ffed,stroke:#1a7f37,stroke-width:2px
 """
-
-    # Caso 3: Pensionista Privado
     elif perfil == PERFIL_PRIVADO:
         return f"""
 flowchart TD
@@ -126,8 +87,6 @@ flowchart TD
     E --> F["💰 Carga final en Paraguay: 0 €<br>Ahorro neto anual: {txt_ahorro}"]
     style F fill:#e6ffed,stroke:#1a7f37,stroke-width:2px
 """
-
-    # Caso 4: Pensionista Público (bifurcación según la nacionalidad)
     else:
         return f"""
 flowchart TD
@@ -142,55 +101,67 @@ flowchart TD
     style G fill:#fff4e5,stroke:#b26a00,stroke-width:2px
 """
 
+def renderizar_mermaid_seguro(codigo_mermaid: str, altura: int = 420):
+    """
+    Parche de Arquitectura v1.1: Renderiza Mermaid usando el motor oficial de CDN
+    en un componente HTML aislado para evitar errores de atributos en Streamlit.
+    """
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <script type="module">
+            import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+            mermaid.initialize({{ startOnLoad: true, theme: 'dark', securityLevel: 'loose' }});
+        </script>
+        <style>
+            body {{ margin: 0; padding: 0; background-color: transparent; display: flex; justify-content: center; }}
+            .mermaid {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; width: 100%; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="mermaid">
+            {codigo_mermaid}
+        </div>
+    </body>
+    </html>
+    """
+    components.html(html_code, height=altura, scrolling=True)
+
 # --- 5. INTERFAZ DE USUARIO — BARRA LATERAL (SIDEBAR) -------------------------
 st.sidebar.header("⚙️ Panel de Control")
 st.sidebar.markdown("Configura los datos del cliente para calcular el impacto fiscal.")
 
-# Control 1: Selección de perfil profesional
 perfil_seleccionado = st.sidebar.selectbox(
     "👤 Perfil Profesional",
     options=(PERFIL_AUTONOMO, PERFIL_PRIVADO, PERFIL_PUBLICO),
     index=0,
 )
 
-# Control 2: Deslizador de ingresos brutos anuales
 ingresos_seleccionados = st.sidebar.slider(
     "💶 Ingresos Brutos Anuales en España (€)",
-    min_value=10000,
-    max_value=150000,
-    step=1000,
-    value=60000,
-    format="%d €",
+    min_value=10000, max_value=150000, step=1000, value=60000, format="%d €",
 )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Requisitos Jurídicos del Modelo")
 
-# Control 3: Compromiso de permanencia y RUC paraguayo
 compromiso_residencia = st.sidebar.checkbox(
-    "¿Te comprometes a residir más de 183 días al año en Paraguay y obtener el RUC?",
-    value=True,
+    "¿Te comprometes a residir más de 183 días al año en Paraguay y obtener el RUC?", value=True,
 )
 
-# Control 4: Casilla condicional (SOLO se muestra si el perfil es Pensionista Público)
 compromiso_nacionalidad = False
 if perfil_seleccionado == PERFIL_PUBLICO:
     compromiso_nacionalidad = st.sidebar.checkbox(
-        "¿Estás dispuesto a tramitar la Nacionalidad Paraguaya (Ley 6984/2022) a los 3 años para activar la exención del CDI?",
-        value=False,
+        "¿Estás dispuesto a tramitar la Nacionalidad Paraguaya (Ley 6984/2022) a los 3 años para activar la exención del CDI?", value=False,
     )
 
 # --- 6. EJECUCIÓN DE CÁLCULOS -------------------------------------------------
 carga_esp = calcular_carga_espana(ingresos_seleccionados)
-carga_py = calcular_carga_paraguay(
-    perfil=perfil_seleccionado,
-    ingresos=ingresos_seleccionados,
-    reside_py=compromiso_residencia,
-    nacionalidad=compromiso_nacionalidad,
-)
+carga_py = calcular_carga_paraguay(perfil_seleccionado, ingresos_seleccionados, compromiso_residencia, compromiso_nacionalidad)
 ahorro_neto = carga_esp - carga_py
 
-# Formateamos los valores en texto para mostrarlos en la interfaz
 txt_carga_esp = formato_euros(carga_esp)
 txt_carga_py = formato_euros(carga_py)
 txt_ahorro = formato_euros(ahorro_neto)
@@ -200,14 +171,12 @@ st.title("🧭 Calculadora y Simulador Fiscal ROLANIA")
 st.markdown("### Simulador de Expatriación Legal España → Paraguay")
 st.markdown(
     "Garantía de seguridad jurídica avalada por el **Convenio de Doble Imposición (CDI) España–Paraguay** "
-    "(vigente y plenos efectos desde 2025) y la **Ley 6380/2019 de Modernización y Simplificación del Sistema Tributario Paraguayo**. "
+    "y la **Ley 6380/2019 de Modernización y Simplificación del Sistema Tributario Paraguayo**. "
     "Sin interpretaciones agresivas ni opacidad: optimización 100 % legal basada en convenios internacionales."
 )
 
 st.divider()
 
-# EVALUACIÓN DE CONDICIONES Y AVISOS DE SEGURIDAD JURÍDICA
-# Si el usuario desmarca la casilla de residencia, mostramos la alerta roja de error exigida.
 if not compromiso_residencia:
     st.error(
         "❌ **Sin residir >183 días y sin RUC, sigues siendo residente fiscal en España por el Art. 9 de la LIRPF. No hay ahorro posible.**\n\n"
@@ -215,41 +184,66 @@ if not compromiso_residencia:
         "trasladar de forma efectiva el centro de vida y acreditar la residencia ante la Dirección Nacional de Ingresos Tributarios (DNIT)."
     )
 
-# TARJETAS DE MÉTRICAS (COLUMNAS DESTACADAS)
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    st.metric(
-        label="🇪🇸 Carga Fiscal en España (Estimada)",
-        value=txt_carga_esp,
-        help="Carga combinada estimada (IRPF + RETA para autónomos o IRPF/IRNR en pensiones)."
-    )
-
+    st.metric(label="🇪🇸 Carga Fiscal en España (Estimada)", value=txt_carga_esp)
 with col2:
-    st.metric(
-        label="🇵🇾 Carga Fiscal en Paraguay (ROLANIA)",
-        value=txt_carga_py,
-        help="Carga tributaria aplicable al fijar tu residencia fiscal en Paraguay bajo el paraguas del CDI."
-    )
-
+    st.metric(label="🇵🇾 Carga Fiscal en Paraguay (ROLANIA)", value=txt_carga_py)
 with col3:
-    st.metric(
-        label="💰 TU AHORRO NETO ANUAL CON ROLANIA",
-        value=txt_ahorro,
-        help="Diferencia directa entre la carga fiscal española y la estrategia optimizada en Paraguay."
-    )
+    st.metric(label="💰 TU AHORRO NETO ANUAL CON ROLANIA", value=txt_ahorro)
 
-# Si hay ahorro real positivo, mostramos un mensaje de confirmación
 if ahorro_neto > 0 and compromiso_residencia:
     st.success(
         f"✅ **Estrategia viable:** Trasladando tu residencia a Paraguay recuperas **{txt_ahorro} cada año** "
         f"de forma legal, protegiendo tu patrimonio y poder adquisitivo."
     )
 
+# --- 8. MOTOR DE MONETIZACIÓN DUAL (NUEVO MVP v1.1) ---------------------------
+st.markdown("---")
+st.markdown("### 🚀 Da el Salto a Paraguay: Elige tu Vía de Acción")
+
+col_cta1, col_cta2 = st.columns(2)
+
+# VÍA 1: ATENCIÓN INMEDIATA POR WHATSAPP (HIGH-TICKET)
+with col_cta1:
+    st.info("📲 **Vía Rápida: Consultoría Personalizada**\n\n¿Quieres validar tu caso con un experto fiscal en directo? Habla ahora mismo con nuestro equipo comercial.")
+    
+    # Redacción dinámica del mensaje de WhatsApp integrando los datos simulados
+    mensaje_wsp = (
+        f"Hola equipo ROLANIA. He usado vuestra calculadora fiscal online:\n"
+        f"• Mi perfil: {perfil_seleccionado}\n"
+        f"• Ingresos en España: {ingresos_seleccionados:,.0f} €\n"
+        f"• Ahorro estimado calculado: {txt_ahorro}\n"
+        f"Quiero solicitar un Estudio de Viabilidad Personalizado para emigrar legalmente."
+    )
+    url_wsp = f"https://wa.me/{TELEFONO_WHATSAPP_ROLANIA}?text={urllib.parse.quote(mensaje_wsp)}"
+    
+    st.link_button(
+        label="💬 Solicitar Estudio por WhatsApp",
+        url=url_wsp,
+        type="primary",
+        use_container_width=True,
+        help="Abre tu aplicación de WhatsApp con un mensaje pre-redactado con tus datos."
+    )
+
+# VÍA 2: CAPTURA DE LEADS (LIBRETO-GUÍA PDF)
+with col_cta2:
+    st.warning("📚 **Vía Estudio: Libreto-Guía en PDF**\n\n¿Prefieres analizar toda la legislación, tablas comparativas y diagramas a tu ritmo? Descarga el manual oficial.")
+    
+    with st.form(key="form_lead_rolania", clear_on_submit=True):
+        email_cliente = st.text_input("Tu Correo Electrónico Profesional", placeholder="ejemplo@profesional.com")
+        btn_enviar_lead = st.form_submit_button("📥 Enviar a mi correo el Libreto-Guía ROLANIA", use_container_width=True)
+        
+        if btn_enviar_lead:
+            if "@" in email_cliente and "." in email_cliente:
+                st.success(f"✅ ¡Confirmado! Hemos registrado tu solicitud para el correo **{email_cliente}**. Recibirás el Libreto-Guía en los próximos 5 minutos.")
+                # Nota de arquitecto: Aquí en el futuro conectaremos tu base de datos de correos (ej. Mailchimp/ActiveCampaign)
+            else:
+                st.error("⚠️ Por favor, introduce una dirección de correo electrónico válida.")
+
 st.divider()
 
-# --- 8. BLOQUE EXPANDIBLE — JUSTIFICACIÓN LEGAL Y DIAGRAMA --------------------
-# Preparamos los textos explicativos (3 viñetas por caso) para el expandible
+# --- 9. BLOQUE EXPANDIBLE — JUSTIFICACIÓN LEGAL Y DIAGRAMA (CORREGIDO) --------
 if not compromiso_residencia:
     vinetas_legales = [
         "**Artículo 9 de la Ley del IRPF española:** Se considera residente fiscal en España a quien pase más de 183 días al año en el país o tenga en él el núcleo principal de sus actividades económicas.",
@@ -268,15 +262,14 @@ elif perfil_seleccionado == PERFIL_PRIVADO:
         "**Exención por Territorialidad en Paraguay (Ley 6380/2019):** Al recibir la pensión en tu cuenta paraguaya, la normativa tributaria local la clasifica como ingreso de fuente extranjera. Por aplicación estricta del principio territorial, queda desgravada al **0 %** en tu declaración paraguaya.",
         "**Seguridad de cobro íntegro:** Mediante la presentación en el INSS del Certificado de Residencia Fiscal en Paraguay (emitido por la DNIT bajo convenio), se paraliza legalmente la retención en origen, cobrando el 100 % de tu pensión bruta mensual.",
     ]
-else:  # Pensionista Público
+else:
     vinetas_legales = [
         "**Regla General — Artículo 18.2.a del CDI (Clases Pasivas):** Las pensiones públicas pagadas por el Estado o Administraciones españolas (funcionarios, militares, jueces) tributan habitualmente de forma exclusiva en el Estado pagador (España), sufriendo una retención por IRNR que oscila entre el 8 % y el 40 % según cuantía.",
         "**La Ruta de Escape ROLANIA — Artículo 18.2.b del CDI:** El propio convenio establece que si el pensionista público es **residente Y NACIONAL** de Paraguay, el derecho de imposición pasa a ser exclusivo del Paraguay, prohibiendo a España retener ningún impuesto (IRNR = 0 €).",
-        "**Viabilidad jurídica mediante la Ley 6984/2022:** Gracias al Convenio de Doble Nacionalidad España-Paraguay de 1959, puedes tramitar la nacionalidad paraguaya a los 3 años de residencia permanente sin perder tu ciudadanía española ni tu pasaporte europeo. Al jurar la nacionalidad, tu pensión pasa a tributar al **0 % total** (exenta en España por el Art. 18.2.b del CDI y exenta en Paraguay por territorialidad de fuente extranjera).",
+        "**Viabilidad jurídica mediante la Ley 6984/2022:** Gracias al Convenio de Doble Nacionalidad España-Paraguay de 1959, puedes tramitar la nacionalidad paraguaya a los 3 años de residencia permanente sin perder tu ciudadanía española ni tu pasaporte europeo. Al jurar la nacionalidad, tu pensión pasa a tributar al **0 % total**.",
     ]
 
-# Renderizamos el contenido expansible con el desglose legal y el gráfico
-with st.expander("📜 Ver justificación legal y diagrama visual de tu ruta", expanded=True):
+with st.expander("📜 Ver justificación legal y diagrama visual de tu ruta", expanded=False):
     st.markdown("#### Marco Jurídico Aplicable a tu Caso")
     for vineta in vinetas_legales:
         st.markdown(f"- {vineta}")
@@ -284,7 +277,6 @@ with st.expander("📜 Ver justificación legal y diagrama visual de tu ruta", e
     st.markdown("---")
     st.markdown("#### Diagrama de Flujo y Decisión Fiscal")
     
-    # Generamos la cadena de texto con la sintaxis de Mermaid
     codigo_mermaid = construir_diagrama_mermaid(
         perfil=perfil_seleccionado,
         reside_py=compromiso_residencia,
@@ -294,15 +286,13 @@ with st.expander("📜 Ver justificación legal y diagrama visual de tu ruta", e
         txt_ahorro=txt_ahorro,
     )
     
-    # Llamamos a la orden de Streamlit para dibujar el gráfico en pantalla
-    st.mermaid(codigo_mermaid)
+    # Usamos la nueva función de renderizado seguro por HTML aislado
+    renderizar_mermaid_seguro(codigo_mermaid)
 
-# --- 9. PIE DE PÁGINA (FOOTER) ------------------------------------------------
+# --- 10. PIE DE PÁGINA (FOOTER) -----------------------------------------------
 st.markdown("---")
 st.caption(
     "⚠️ **Nota legal y de descargo de responsabilidad:** Este simulador fiscal proporciona estimaciones orientativas "
     "y educativas basadas en el Convenio de Doble Imposición (CDI) España-Paraguay y la normativa tributaria vigente. "
-    "Los cálculos de carga española representan una media efectiva simplificada por tramos y no sustituyen un asesoramiento "
-    "profesional personalizado. ROLANIA recomienda realizar un estudio de viabilidad fiscal individualizado antes de ejecutar "
-    "cualquier traslado internacional de residencia."
+    "ROLANIA recomienda realizar un estudio de viabilidad fiscal individualizado antes de ejecutar cualquier traslado internacional."
 )
